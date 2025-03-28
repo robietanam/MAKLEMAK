@@ -12,7 +12,7 @@ from .dynamic_snake_conv import DySnakeConv
 from .ops_dcnv3.modules import DCNv3, DCNv3_DyHead
 from ultralytics.yolo.utils.torch_utils import make_divisible
 
-__all__ = ['DyHeadBlock', 'DyHeadBlockWithDCNV3', 'Fusion', 'C2f_Faster', 'C3_Faster', 'C3_ODConv', 'C2f_ODConv', 'Partial_conv3', 'C2f_Faster_EMA', 'C3_Faster_EMA', 'C2f_DBB',
+__all__ = ['DyHeadBlock', 'DyHeadBlockWithDCNV3', 'Fusion', 'C2f_Faster', 'C2f_Star' ,'C3_Faster', 'C3_ODConv', 'C2f_ODConv', 'Partial_conv3', 'C2f_Faster_EMA', 'C3_Faster_EMA', 'C2f_DBB',
            'GSConv', 'VoVGSCSP', 'VoVGSCSPC', 'C2f_CloAtt', 'C3_CloAtt', 'SCConv', 'C3_SCConv', 'C2f_SCConv', 'ScConv', 'C3_ScConv', 'C2f_ScConv',
            'LAWDS', 'EMSConv', 'EMSConvP', 'C3_EMSC', 'C3_EMSCP', 'C2f_EMSC', 'C2f_EMSCP', 'RCSOSA', 'C3_KW', 'C2f_KW',
            'C3_DySnakeConv', 'C2f_DySnakeConv', 'DCNv2', 'C3_DCNv2', 'C2f_DCNv2', 'DCNV3_YOLO', 'C3_DCNv3', 'C2f_DCNv3']
@@ -477,6 +477,47 @@ class C2f_Faster(C2f):
         self.m = nn.ModuleList(Faster_Block(self.c, self.c) for _ in range(n))
 
 ######################################## C2f-Faster end ########################################
+
+
+######################################## C2f-Star begin ########################################
+
+
+class ConvBN(torch.nn.Sequential):
+    def __init__(self, in_planes, out_planes, kernel_size=1, stride=1, padding=0, dilation=1, groups=1, with_bn=True):
+        super().__init__()
+        self.add_module('conv', torch.nn.Conv2d(in_planes, out_planes, kernel_size, stride, padding, dilation, groups))
+        if with_bn:
+            self.add_module('bn', torch.nn.BatchNorm2d(out_planes))
+            torch.nn.init.constant_(self.bn.weight, 1)
+            torch.nn.init.constant_(self.bn.bias, 0)
+
+
+class StarNetBlock(nn.Module):
+    def __init__(self, dim, mlp_ratio=3, drop_path=0.):
+        super().__init__()
+        self.dwconv = ConvBN(dim, dim, 7, 1, (7 - 1) // 2, groups=dim, with_bn=True)
+        self.f1 = ConvBN(dim, mlp_ratio * dim, 1, with_bn=False)
+        self.f2 = ConvBN(dim, mlp_ratio * dim, 1, with_bn=False)
+        self.g = ConvBN(mlp_ratio * dim, dim, 1, with_bn=True)
+        self.dwconv2 = ConvBN(dim, dim, 7, 1, (7 - 1) // 2, groups=dim, with_bn=False)
+        self.act = nn.ReLU6()
+        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+
+    def forward(self, x):
+        input = x
+        x = self.dwconv(x)
+        x1, x2 = self.f1(x), self.f2(x)
+        x = self.act(x1) * x2
+        x = self.dwconv2(self.g(x))
+        return input + self.drop_path(x)
+
+class C2f_Star(C2f):
+    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5):
+        super().__init__(c1, c2, n, shortcut, g, e)
+        self.m = nn.ModuleList(StarNetBlock(self.c) for _ in range(n))
+
+######################################## C2f-Star end ########################################
+
 
 ######################################## C2f-OdConv begin ########################################
 

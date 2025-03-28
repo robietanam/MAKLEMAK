@@ -24,6 +24,7 @@ from ultralytics.nn.backbone.EfficientFormerV2 import *
 from ultralytics.nn.backbone.VanillaNet import *
 from ultralytics.nn.backbone.revcol import *
 from ultralytics.nn.backbone.lsknet import *
+from ultralytics.nn.backbone.starnet import *
 
 try:
     import thop
@@ -206,7 +207,7 @@ class BaseModel(nn.Module):
         self = super()._apply(fn)
         m = self.model[-1]  # Detect()
         if isinstance(m, (Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, Detect_AFPN_P345, Detect_AFPN_P345_Custom, 
-                          Detect_Efficient, DetectAux, Detect_DyHeadWithDCNV3, Segment)):
+                          Detect_Efficient, DetectAux, Detect_DyHeadWithDCNV3, Detect_TADDH, Segment)):
             m.stride = fn(m.stride)
             m.anchors = fn(m.anchors)
             m.strides = fn(m.strides)
@@ -272,7 +273,7 @@ class DetectionModel(BaseModel):
         # Build strides
         m = self.model[-1]  # Detect()
         if isinstance(m, (Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, Detect_AFPN_P345, Detect_AFPN_P345_Custom, 
-                          Detect_Efficient, DetectAux, Detect_DyHeadWithDCNV3, Segment, Pose)):
+                          Detect_Efficient, DetectAux, Detect_DyHeadWithDCNV3, Detect_TADDH, Segment, Pose)):
             s = 640  # 2x min stride
             m.inplace = self.inplace
             if isinstance(m, (DetectAux,)):
@@ -600,7 +601,7 @@ def attempt_load_weights(weights, device=None, inplace=True, fuse=False):
     for m in ensemble.modules():
         t = type(m)
         if t in (nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, Detect_AFPN_P345, 
-                 Detect_AFPN_P345_Custom, Detect_Efficient, DetectAux, Detect_DyHeadWithDCNV3, Segment):
+                 Detect_AFPN_P345_Custom, Detect_Efficient, DetectAux, Detect_DyHeadWithDCNV3, Detect_TADDH, Segment):
             m.inplace = inplace  # torch 1.7.0 compatibility
         elif t is nn.Upsample and not hasattr(m, 'recompute_scale_factor'):
             m.recompute_scale_factor = None  # torch 1.11.0 compatibility
@@ -694,7 +695,7 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
 
         n = n_ = max(round(n * depth), 1) if n > 1 else n  # depth gain
         if m in (Classify, Conv, ConvTranspose, GhostConv, Bottleneck, GhostBottleneck, SPP, SPPF, DWConv, Focus,
-                 BottleneckCSP, C1, C2, C2f, C3, C3TR, C3Ghost, nn.ConvTranspose2d, DWConvTranspose2d, C3x, RepC3, C2f_Faster, C2f_ODConv,
+                 BottleneckCSP, C1, C2, C2f, C3, C3TR, C3Ghost, nn.ConvTranspose2d, DWConvTranspose2d, C3x, RepC3, C2f_Faster, C2f_Star ,C2f_ODConv,
                  C2f_Faster_EMA, C2f_DBB, GSConv, VoVGSCSP, VoVGSCSPC, C2f_CloAtt, C3_CloAtt, SCConv, C2f_SCConv, C3_SCConv, C2f_ScConv, C3_ScConv,
                  C3_EMSC, C3_EMSCP, C2f_EMSC, C2f_EMSCP, RCSOSA, KWConv, C2f_KW, C3_KW, DySnakeConv, C2f_DySnakeConv, C3_DySnakeConv,
                  DCNv2, C3_DCNv2, C2f_DCNv2, DCNV3_YOLO, C3_DCNv3, C2f_DCNv3, C3_Faster, C3_Faster_EMA, C3_ODConv):
@@ -711,7 +712,7 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
             if m in (DySnakeConv,):
                 c2 = c2 * 3
             
-            if m in (BottleneckCSP, C1, C2, C2f, C3, C3TR, C3Ghost, C3x, RepC3, C2f_Faster, C2f_ODConv, C2f_Faster_EMA, C2f_DBB,
+            if m in (BottleneckCSP, C1, C2, C2f, C3, C3TR, C3Ghost, C3x, RepC3, C2f_Faster, C2f_Star , C2f_ODConv, C2f_Faster_EMA, C2f_DBB,
                      VoVGSCSP, VoVGSCSPC, C2f_CloAtt, C3_CloAtt, C2f_SCConv, C3_SCConv, C2f_ScConv, C3_ScConv,
                      C3_EMSC, C3_EMSCP, C2f_EMSC, C2f_EMSCP, RCSOSA, C2f_KW, C3_KW, C2f_DySnakeConv, C3_DySnakeConv,
                      C3_DCNv2, C2f_DCNv2, C3_DCNv3, C2f_DCNv3, C3_Faster, C3_Faster_EMA, C3_ODConv):
@@ -730,7 +731,7 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
         elif m is Concat:
             c2 = sum(ch[x] for x in f)
         elif m in (Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, Detect_AFPN_P345, Detect_AFPN_P345_Custom, 
-                   Detect_Efficient, DetectAux, Detect_DyHeadWithDCNV3, Segment, Pose, RTDETRDecoder):
+                   Detect_Efficient, DetectAux, Detect_DyHeadWithDCNV3, Detect_TADDH, Segment, Pose, RTDETRDecoder):
             args.append([ch[x] for x in f])
             if m is Segment:
                 args[2] = make_divisible(min(args[2], max_channels) * width, 8)
@@ -743,7 +744,7 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
             m = timm.create_model(m, pretrained=args[0], features_only=True)
             c2 = m.feature_info.channels()
         elif m in {convnextv2_atto, convnextv2_femto, convnextv2_pico, convnextv2_nano, convnextv2_tiny, convnextv2_base, convnextv2_large, convnextv2_huge,
-                   fasternet_t0, fasternet_t1, fasternet_t2, fasternet_s, fasternet_m, fasternet_l,
+                   fasternet_t0, fasternet_t1, fasternet_t2, fasternet_s, fasternet_m, fasternet_l, starnet_s050, starnet_s1, starnet_s2, starnet_s3, starnet_s4,
                    EfficientViT_M0, EfficientViT_M1, EfficientViT_M2, EfficientViT_M3, EfficientViT_M4, EfficientViT_M5,
                    efficientformerv2_s0, efficientformerv2_s1, efficientformerv2_s2, efficientformerv2_l,
                    vanillanet_5, vanillanet_6, vanillanet_7, vanillanet_8, vanillanet_9, vanillanet_10, vanillanet_11, vanillanet_12, vanillanet_13, vanillanet_13_x1_5, vanillanet_13_x1_5_ada_pool,
@@ -871,7 +872,7 @@ def guess_model_task(model):
         for m in model.modules():
             if isinstance(m, (Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, 
                               Detect_AFPN_P345, Detect_AFPN_P345_Custom, Detect_Efficient, DetectAux,
-                              Detect_DyHeadWithDCNV3)):
+                              Detect_DyHeadWithDCNV3, Detect_TADDH)):
                 return 'detect'
             elif isinstance(m, Segment):
                 return 'segment'
