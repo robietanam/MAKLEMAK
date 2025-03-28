@@ -638,7 +638,7 @@ def attempt_load_one_weight(weight, device=None, inplace=True, fuse=False):
     for m in model.modules():
         t = type(m)
         if t in (nn.Hardswish, nn.LeakyReLU, nn.ReLU, nn.ReLU6, nn.SiLU, Detect, Detect_DyHead, Detect_AFPN_P2345, Detect_AFPN_P2345_Custom, Detect_AFPN_P345, Detect_AFPN_P345_Custom,
-                 DetectAux, Detect_Efficient, Segment):
+                 DetectAux, Detect_Efficient, Detect_TADDH,Segment):
             m.inplace = inplace  # torch 1.7.0 compatibility
         elif t is nn.Upsample and not hasattr(m, 'recompute_scale_factor'):
             m.recompute_scale_factor = None  # torch 1.11.0 compatibility
@@ -735,6 +735,8 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
             args.append([ch[x] for x in f])
             if m is Segment:
                 args[2] = make_divisible(min(args[2], max_channels) * width, 8)
+            if m in ( Detect_TADDH):
+                args[1] = make_divisible(min(args[1], max_channels) * width, 8)
         elif m is Fusion:
             args[0] = d[args[0]]
             c1, c2 = [ch[x] for x in f], (sum([ch[x] for x in f]) if args[0] == 'concat' else ch[f[0]])
