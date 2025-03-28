@@ -1,7 +1,10 @@
 import math
 import torch
+import torch.nn.functional as F
 import torch.nn as nn
 from torch.nn.init import constant_, xavier_uniform_
+
+from ultralytics.nn.modules.conv import autopad
 
 from ..modules import Conv, DFL, C2f, RepConv
 from .block import *
