@@ -735,7 +735,7 @@ def parse_model(d, ch, verbose=True, warehouse_manager=None):  # model_dict, inp
             args.append([ch[x] for x in f])
             if m is Segment:
                 args[2] = make_divisible(min(args[2], max_channels) * width, 8)
-            if m in ( Detect_TADDH):
+            if m is Detect_TADDH:
                 args[1] = make_divisible(min(args[1], max_channels) * width, 8)
         elif m is Fusion:
             args[0] = d[args[0]]
