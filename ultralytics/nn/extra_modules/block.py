@@ -12,7 +12,7 @@ from .dynamic_snake_conv import DySnakeConv
 from .ops_dcnv3.modules import DCNv3, DCNv3_DyHead
 from ultralytics.yolo.utils.torch_utils import make_divisible
 
-__all__ = ['DyHeadBlock', 'DyHeadBlockWithDCNV3', 'Fusion', 'C2f_Faster', 'C2f_Star' ,'C3_Faster', 'C3_ODConv', 'C2f_ODConv', 'Partial_conv3', 'C2f_Faster_EMA', 'C3_Faster_EMA', 'C2f_DBB',
+__all__ = ['DyHeadBlock', 'DyHeadBlockWithDCNV3', 'Fusion', 'C2f_Faster', 'C2f_Star' , 'C2f_Star_EMA','C3_Faster', 'C3_ODConv', 'C2f_ODConv', 'Partial_conv3', 'C2f_Faster_EMA', 'C3_Faster_EMA', 'C2f_DBB',
            'GSConv', 'VoVGSCSP', 'VoVGSCSPC', 'C2f_CloAtt', 'C3_CloAtt', 'SCConv', 'C3_SCConv', 'C2f_SCConv', 'ScConv', 'C3_ScConv', 'C2f_ScConv',
            'LAWDS', 'EMSConv', 'EMSConvP', 'C3_EMSC', 'C3_EMSCP', 'C2f_EMSC', 'C2f_EMSCP', 'RCSOSA', 'C3_KW', 'C2f_KW',
            'C3_DySnakeConv', 'C2f_DySnakeConv', 'DCNv2', 'C3_DCNv2', 'C2f_DCNv2', 'DCNV3_YOLO', 'C3_DCNv3', 'C2f_DCNv3']
@@ -509,10 +509,30 @@ class StarNetBlock(nn.Module):
         x = self.dwconv2(self.g(x))
         return input + self.drop_path(x)
 
+
+class Star_Block_EMA(StarNetBlock):
+    def __init__(self, dim, mlp_ratio=3, drop_path=0):
+        super().__init__(dim, mlp_ratio, drop_path)
+        self.attention = EMA(mlp_ratio * dim)
+    
+    def forward(self, x):
+        input = x
+        x = self.dwconv(x)
+        x1, x2 = self.f1(x), self.f2(x)
+        x = self.act(x1) * x2
+        x = self.dwconv2(self.g(self.attention(x)))
+        x = input + self.drop_path(x)
+        return x
+
 class C2f_Star(C2f):
     def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5):
         super().__init__(c1, c2, n, shortcut, g, e)
         self.m = nn.ModuleList(StarNetBlock(self.c) for _ in range(n))
+
+class C2f_Star_EMA(C2f):
+    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5):
+        super().__init__(c1, c2, n, shortcut, g, e)
+        self.m = nn.ModuleList(Star_Block_EMA(self.c) for _ in range(n))
 
 ######################################## C2f-Star end ########################################
 
