@@ -59,6 +59,7 @@ from pathlib import Path
 import torch
 
 from ultralytics.nn.autobackend import check_class_names
+from ultralytics.nn.extra_modules.head import Detect_TADDH
 from ultralytics.nn.modules import C2f, Detect, Segment
 from ultralytics.nn.tasks import DetectionModel, SegmentationModel
 from ultralytics.yolo.cfg import get_cfg
@@ -184,7 +185,7 @@ class Exporter:
         model.float()
         model = model.fuse()
         for k, m in model.named_modules():
-            if isinstance(m, (Detect, Segment)):
+            if isinstance(m, (Detect, Detect_TADDH, Segment)):
                 m.dynamic = self.args.dynamic
                 m.export = True
                 m.format = self.args.format
