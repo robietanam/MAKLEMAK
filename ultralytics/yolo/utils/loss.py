@@ -9,7 +9,7 @@ from ultralytics.yolo.utils.ops import crop_mask, xywh2xyxy, xyxy2xywh
 from ultralytics.yolo.utils.tal import TaskAlignedAssigner, dist2bbox, make_anchors
 from ultralytics.yolo.utils.atss import ATSSAssigner, generate_anchors
 
-from .metrics import bbox_iou, bbox_mpdiou, wasserstein_loss
+from .metrics import WiseIouLoss, bbox_iou, bbox_mpdiou, wasserstein_loss
 from .tal import bbox2dist
 
 import math
@@ -99,13 +99,23 @@ class BboxLoss(nn.Module):
         self.use_dfl = use_dfl
         self.nwd_loss = False
         self.iou_ratio = 0.5
+        
+        self.use_wiseiou = False
+        
+        if self.use_wiseiou:
+            self.wiou_loss = WiseIouLoss(ltype='WIoU', monotonous=False, inner_iou=False, focaler_iou=False)
 
     def forward(self, pred_dist, pred_bboxes, anchor_points, target_bboxes, target_scores, target_scores_sum, fg_mask, mpdiou_hw=None):
         """IoU loss."""
         weight = target_scores.sum(-1)[fg_mask].unsqueeze(-1)
-        iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)
-        # iou = bbox_mpdiou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, mpdiou_hw=mpdiou_hw)
-        loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
+        if self.use_wiseiou:
+            wiou = self.wiou_loss(pred_bboxes[fg_mask], target_bboxes[fg_mask], ret_iou=False, ratio=0.7, d=0.0, u=0.95).unsqueeze(-1)
+            loss_iou = (wiou * weight).sum() / target_scores_sum
+        else:
+            iou = bbox_iou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, CIoU=True)
+            # iou = bbox_mpdiou(pred_bboxes[fg_mask], target_bboxes[fg_mask], xywh=False, mpdiou_hw=mpdiou_hw[fg_mask])
+            
+            loss_iou = ((1.0 - iou) * weight).sum() / target_scores_sum
         
         if self.nwd_loss:
             nwd = wasserstein_loss(pred_bboxes[fg_mask], target_bboxes[fg_mask])
