@@ -59,6 +59,7 @@ from pathlib import Path
 import torch
 
 from ultralytics.nn.autobackend import check_class_names
+from ultralytics.nn.extra_modules.block import C2f_Star
 from ultralytics.nn.extra_modules.head import Detect_TADDH
 from ultralytics.nn.modules import C2f, Detect, Segment
 from ultralytics.nn.tasks import DetectionModel, SegmentationModel
@@ -189,7 +190,7 @@ class Exporter:
                 m.dynamic = self.args.dynamic
                 m.export = True
                 m.format = self.args.format
-            elif isinstance(m, C2f) and not any((saved_model, pb, tflite, edgetpu, tfjs)):
+            elif isinstance(m, (C2f, C2f_Star)) and not any((saved_model, pb, tflite, edgetpu, tfjs)):
                 # EdgeTPU does not support FlexSplitV while split provides cleaner ONNX graph
                 m.forward = m.forward_split
 

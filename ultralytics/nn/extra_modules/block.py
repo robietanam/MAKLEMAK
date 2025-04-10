@@ -27,9 +27,12 @@ def autopad(k, p=None, d=1):  # kernel, padding, dilation
 
 ######################################## DyHead begin ########################################
 
-from mmcv.cnn import build_activation_layer, build_norm_layer
-from mmcv.ops.modulated_deform_conv import ModulatedDeformConv2d
-from mmengine.model import constant_init, normal_init
+try:
+    from mmcv.cnn import build_activation_layer, build_norm_layer
+    from mmcv.ops.modulated_deform_conv import ModulatedDeformConv2d
+    from mmengine.model import constant_init, normal_init
+except ImportError:
+    pass
 
 def _make_divisible(v, divisor, min_value=None):
     if min_value is None:

@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 
 __all__ = ('Conv', 'Conv2', 'LightConv', 'DWConv', 'DWConvTranspose2d', 'ConvTranspose', 'Focus', 'GhostConv',
-           'ChannelAttention', 'SpatialAttention', 'CBAM', 'Concat', 'RepConv')
+           'ChannelAttention', 'SpatialAttention', 'CBAM', 'Concat', 'RepConv', 'DSConv')
 
 
 def autopad(k, p=None, d=1):  # kernel, padding, dilation
@@ -86,6 +86,17 @@ class DWConv(Conv):
         super().__init__(c1, c2, k, s, g=math.gcd(c1, c2), d=d, act=act)
 
 
+class DSConv(nn.Module):
+    """Depthwise Separable Convolution"""
+    def __init__(self, c1, c2, k=1, s=1, d=1, act=True) -> None:
+        super().__init__()
+        
+        self.dwconv = DWConv(c1, c1, 3)
+        self.pwconv = Conv(c1, c2, 1)
+    
+    def forward(self, x):
+        return self.pwconv(self.dwconv(x))
+    
 class DWConvTranspose2d(nn.ConvTranspose2d):
     """Depth-wise transpose convolution."""
 
